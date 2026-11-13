@@ -39,6 +39,20 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()[:16]
 
 
+def _duration_seconds(data: dict) -> Optional[float]:
+    """Cowrie writes 'duration' in seconds; older exports use 'duration_ms'."""
+    for key, factor in (("duration", 1), ("duration_ms", 1000)):
+        value = data.get(key)
+        if isinstance(value, str):
+            try:
+                value = float(value)
+            except ValueError:
+                value = None
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return round(value / factor, 3)
+    return None
+
+
 def parse_line(raw: str) -> Optional[dict]:
     """Turn one raw log line into an event dict, or None if unusable."""
     raw = raw.strip()
@@ -64,7 +78,7 @@ def parse_line(raw: str) -> Optional[dict]:
         return None
 
     password = data.get("password", "")
-    duration_ms = data.get("duration_ms")
+    duration_s = _duration_seconds(data)
 
     return {
         "event_id": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
@@ -76,7 +90,7 @@ def parse_line(raw: str) -> Optional[dict]:
         "password_masked": mask_password(password) if password else None,
         "password_hash": hash_password(password) if password else None,
         "command": data.get("input"),
-        "duration_s": round(duration_ms / 1000, 3) if isinstance(duration_ms, (int, float)) else None,
+        "duration_s": duration_s,
     }
 
 

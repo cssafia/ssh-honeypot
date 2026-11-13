@@ -41,3 +41,14 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_alerts_ip ON alerts (source_ip);
+
+CREATE TABLE IF NOT EXISTS ip_geo (
+    ip           TEXT PRIMARY KEY,
+    country      TEXT,
+    country_code TEXT,
+    city         TEXT,
+    lat          REAL,
+    lon          REAL,
+    is_private   INTEGER NOT NULL DEFAULT 0,
+    looked_up_at TEXT NOT NULL
+);

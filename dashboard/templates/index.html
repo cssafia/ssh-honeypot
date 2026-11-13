@@ -10,7 +10,7 @@
 <header class="topbar">
   <div class="brand">&gt;_ SSH<span class="accent">SENTINEL</span></div>
   <nav>
-    <a href="#overview">Overview</a><a href="#timeline">Timeline</a>
+    <a href="#overview">Overview</a><a href="#timeline">Timeline</a><a href="#map">Map</a>
     <a href="#credentials">Credentials</a><a href="#attackers">Attackers</a>
     <a href="#sessions">Sessions</a><a href="#alerts">Alerts</a><a href="#events">Events</a>
   </nav>
@@ -55,6 +55,21 @@
       </div>
     </div>
     <div class="chart-box"><canvas id="ch-timeline"></canvas></div>
+  </section>
+
+  <section id="map" class="grid-2 wide-left">
+    <div class="panel">
+      <h2>// Attack origins</h2>
+      <div class="map-box">
+        <canvas id="map-canvas" aria-label="World map of attack origins"></canvas>
+        <div id="map-tip" class="map-tip hidden"></div>
+      </div>
+      <p id="map-note" class="muted map-note"></p>
+    </div>
+    <div class="panel">
+      <h2>// Top countries</h2>
+      <div id="t-countries" class="table-wrap"></div>
+    </div>
   </section>
 
   <section id="credentials" class="grid-2">
@@ -125,6 +140,7 @@
   Passwords are shown masked only.</footer>
 
 <script src="{{ url_for('static', filename='js/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/worldmap.js') }}"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

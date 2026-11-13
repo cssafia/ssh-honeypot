@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSH Sentinel - Detecting and understanding SSH attacks with a honeypot</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/slides.css">
+</head>
+<body>
+
+<!-- ============================ ICON SET (line icons, 48x48) ============================ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-server" viewBox="0 0 48 48"><rect x="6" y="8" width="36" height="14" rx="3"/><rect x="6" y="26" width="36" height="14" rx="3"/><circle cx="13" cy="15" r="1.6" fill="currentColor"/><circle cx="13" cy="33" r="1.6" fill="currentColor"/><path d="M22 15h14M22 33h14"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><ellipse cx="24" cy="12" rx="14" ry="6"/><path d="M10 12v24c0 3.3 6.3 6 14 6s14-2.7 14-6V12"/><path d="M10 24c0 3.3 6.3 6 14 6s14-2.7 14-6"/></symbol>
+  <symbol id="i-web" viewBox="0 0 48 48"><rect x="5" y="8" width="38" height="32" rx="4"/><path d="M5 17h38"/><circle cx="11" cy="12.5" r="1.2" fill="currentColor"/><circle cx="16" cy="12.5" r="1.2" fill="currentColor"/><circle cx="24" cy="29" r="7"/><path d="M17 29h14M24 22c-3 3-3 11 0 14M24 22c3 3 3 11 0 14"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect x="5" y="9" width="38" height="30" rx="4"/><path d="M12 19l7 6-7 6M24 32h10"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle cx="15" cy="24" r="8"/><circle cx="15" cy="24" r="2.5" fill="currentColor"/><path d="M23 24h20M36 24v6M42 24v5"/></symbol>
+  <symbol id="i-hacker" viewBox="0 0 48 48"><path d="M8 43c0-9 6-14 16-14s16 5 16 14"/><path d="M11 24c0-9 5-16 13-16s13 7 13 16c0 6-5 10-13 10s-13-4-13-10z"/><ellipse cx="24" cy="24" rx="8" ry="6.5" fill="#0b0d0c"/><circle cx="21" cy="24" r="1.8" fill="#ff4d4d" stroke="none"/><circle cx="27" cy="24" r="1.8" fill="#ff4d4d" stroke="none"/></symbol>
+  <symbol id="i-firewall" viewBox="0 0 48 48"><rect x="5" y="10" width="38" height="28" rx="2"/><path d="M5 19.3h38M5 28.6h38M19 10v9.3M33 10v9.3M12 19.3v9.3M26 19.3v9.3M40 19.3v9.3M19 28.6V38M33 28.6V38"/></symbol>
+  <symbol id="i-honeypot" viewBox="0 0 48 48"><path d="M13 14h22v-4a2 2 0 0 0-2-2H15a2 2 0 0 0-2 2z"/><path d="M12 14h24l2 22a5 5 0 0 1-5 6H15a5 5 0 0 1-5-6z"/><path d="M16 27c2.5-4 5.5-6 8-6s5.5 2 8 6c-2.5 4-5.5 6-8 6s-5.5-2-8-6z"/><circle cx="24" cy="27" r="2.6" fill="currentColor"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path d="M3 24s8-13 21-13 21 13 21 13-8 13-21 13S3 24 3 24z"/><circle cx="24" cy="24" r="6"/><circle cx="24" cy="24" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-shell" viewBox="0 0 48 48"><ellipse cx="24" cy="25" rx="18" ry="12" transform="rotate(-18 24 25)"/><path d="M8 31c9-5 23-7 33-3"/><path d="M16 29.5v4M20.5 28v4.2M25 27v4.4M29.5 26.5v4.2M34 27v4"/><path d="M14 23.5l3-1.5M18 20.5l3-1.2M23 18.6l3-.8M28 17.8l3-.2"/></symbol>
+  <symbol id="i-hammer" viewBox="0 0 48 48"><rect x="21" y="5" width="24" height="11" rx="2" transform="rotate(45 33 10.5)"/><path d="M26 22L8 40"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path d="M5 11c6-2 13-1 19 3v26c-6-4-13-5-19-3z"/><path d="M43 11c-6-2-13-1-19 3v26c6-4 13-5 19-3z"/><path d="M11 19c3-.6 6 0 9 1.6M11 26c3-.6 6 0 9 1.6"/></symbol>
+  <symbol id="i-spray" viewBox="0 0 48 48"><rect x="8" y="20" width="16" height="22" rx="3"/><path d="M12 20v-7h9v7M21 14h9v-3H17"/><path d="M12 30h8"/><circle cx="35" cy="14" r="1.4" fill="currentColor"/><circle cx="40" cy="18" r="1.4" fill="currentColor"/><circle cx="37" cy="23" r="1.4" fill="currentColor"/><circle cx="43" cy="24" r="1.4" fill="currentColor"/><circle cx="40" cy="29" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle cx="21" cy="21" r="12"/><path d="M30 30l13 13"/><path d="M15 21h12M15 17h8M15 25h8"/></symbol>
+  <symbol id="i-session" viewBox="0 0 48 48"><rect x="3" y="17" width="14" height="14" rx="3"/><rect x="31" y="17" width="14" height="14" rx="3"/><path d="M17 24h14"/><path d="M24 14v-5M24 34v5" /></symbol>
+  <symbol id="i-alert" viewBox="0 0 48 48"><path d="M24 6L44 40H4z"/><path d="M24 20v10"/><circle cx="24" cy="35" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 48 48"><path d="M24 43s13-12 13-22a13 13 0 0 0-26 0c0 10 13 22 13 22z"/><circle cx="24" cy="21" r="5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle cx="24" cy="24" r="18"/><path d="M6 24h36M24 6c-8 9-8 27 0 36M24 6c8 9 8 27 0 36"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><rect x="9" y="21" width="30" height="21" rx="4"/><path d="M15 21v-6a9 9 0 0 1 18 0v6"/><circle cx="24" cy="31" r="2.5" fill="currentColor"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path d="M24 5l16 6v12c0 10-7 17-16 20C15 40 8 33 8 23V11z"/><path d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-door" viewBox="0 0 48 48"><rect x="12" y="5" width="24" height="38" rx="2"/><circle cx="31" cy="25" r="2" fill="currentColor"/><path d="M6 43h36"/></symbol>
+  <symbol id="i-playbook" viewBox="0 0 48 48"><rect x="9" y="8" width="30" height="35" rx="3"/><rect x="17" y="4" width="14" height="8" rx="2"/><path d="M15 21h18M15 28h18M15 35h10"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 48 48"><path d="M10 35V23a14 14 0 0 1 28 0v12l4 4H6z"/><path d="M20 43a4 4 0 0 0 8 0"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 48 48"><path d="M24 5l17 9v20l-17 9-17-9V14z"/><path d="M7 14l17 9 17-9M24 23v20"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 48 48"><path d="M6 12h36M6 24h36M6 36h36"/><circle cx="17" cy="12" r="4" fill="#141815"/><circle cx="31" cy="24" r="4" fill="#141815"/><circle cx="14" cy="36" r="4" fill="#141815"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><path d="M8 25l11 11 21-23"/></symbol>
+  <symbol id="i-x" viewBox="0 0 48 48"><path d="M11 11l26 26M37 11L11 37"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect x="9" y="10" width="30" height="21" rx="2"/><path d="M3 39h42l-3-8H6z"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 48 48"><rect x="4" y="14" width="40" height="26" rx="4"/><circle cx="24" cy="27" r="8"/><path d="M15 14l3-6h12l3 6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path d="M11 5h18l9 9v29H11z"/><path d="M29 5v9h9M17 24h14M17 30h14M17 36h9"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path d="M17 5v10M31 5v10"/><path d="M11 15h26v8a13 13 0 0 1-26 0z"/><path d="M24 36v8"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle cx="24" cy="24" r="18"/><path d="M24 12v13l8 5"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><circle cx="24" cy="10" r="5"/><circle cx="9" cy="37" r="5"/><circle cx="39" cy="37" r="5"/><path d="M21 14.5L11.5 32.5M27 14.5l9.5 18M14 37h20"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path d="M10 22c0-8 6-14 14-14s14 6 14 14c0 5-2 8-5 10v6H15v-6c-3-2-5-5-5-10z"/><circle cx="18" cy="23" r="3" fill="currentColor"/><circle cx="30" cy="23" r="3" fill="currentColor"/><path d="M21 38v-4M27 38v-4"/></symbol>
+</svg>
+
+<div id="deck">
+<div id="stage">
+  <div class="chrome-progress"><i id="bar"></i></div>
+
+  <!-- ================================== 01 TITLE ================================== -->
+  <section class="slide s-title" id="title" data-title="Title">
+    <canvas id="rain" width="1280" height="720"></canvas>
+    <div class="t-left">
+      <div class="t-kicker">// student project &middot; cybersecurity</div>
+      <h1 class="hero">SSH<span class="accent">SENTINEL</span><span class="caret-block"></span></h1>
+      <p class="sub">Detecting and understanding <b>SSH attacks</b><br>with a <b>honeypot</b></p>
+      <div class="miniterm" id="miniterm" aria-hidden="true">
+        <div class="mt-head"><i></i><i></i><i></i><span>attacker@kali &mdash; ssh -p 2222</span><em id="mt-count">attempt #1</em></div>
+        <div class="mt-body" id="mt-body"></div>
+      </div>
+      <div class="team">
+        <div class="person"><span class="avatar">SL</span><span>Safia Lounassi</span></div>
+        <div class="person"><span class="avatar">OG</span><span>Ourda Ghanem</span></div>
+        <div class="person"><span class="avatar">AM</span><span>Amroun Maanel</span></div>
+      </div>
+      <div class="t-date">November 2026</div>
+    </div>
+    <div class="t-art" id="tart">
+      <div class="radar"><i></i><i></i><i></i></div>
+      <button class="jar-btn" id="jar" aria-label="Touch the honeypot"><svg class="ic"><use href="#i-honeypot"/></svg></button>
+      <span class="fchip c1">root:123456</span><span class="fchip c2">admin:admin</span>
+      <span class="fchip c3">pi:raspberry</span><span class="fchip c4">ubuntu:ubuntu</span>
+      <span class="fchip c5">root:toor</span><span class="fchip c6">test:test</span>
+      <div class="jar-alert" id="jar-alert"><svg class="ic"><use href="#i-alert"/></svg> ATTACKER CAUGHT</div>
+    </div>
+  </section>
+
+  <!-- ================================== 02 SCENARIO ================================== -->
+  <section class="slide" id="scenario" data-title="The scenario">
+    <header class="head">
+      <div class="kicker"><b>02</b> &middot; The scenario</div>
+      <h1 class="t">Imagine a company&hellip;</h1>
+    </header>
+    <div class="sc-body">
+      <div class="sc-wrap">
+        <svg id="scene" viewBox="0 0 820 440" class="scene" role="img" aria-label="A company network with servers; an unknown attacker on the internet tries to reach the SSH administration server">
+          <path d="M228 8v424" class="dash"/>
+          <text x="228" y="436" text-anchor="middle" class="tiny" id="sc-inet">INTERNET</text>
+
+          <g id="sc-attacker">
+            <circle class="halo" cx="85" cy="345" r="62"/>
+            <use href="#i-hacker" x="30" y="290" width="110" height="110" class="red"/>
+            <text x="85" y="416" text-anchor="middle" class="lbl red">Unknown IP</text>
+            <text x="85" y="432" text-anchor="middle" class="tiny">203.0.113.10</text>
+          </g>
+
+          <g id="sc-company">
+            <rect x="300" y="8" width="512" height="424" rx="12" class="cbox"/>
+            <text x="322" y="36" class="lbl">ACME CORP &middot; private network</text>
+            <g class="srvs">
+              <use href="#i-server" x="330" y="52" width="52" height="52"/><use href="#i-server" x="422" y="52" width="52" height="52"/><use href="#i-server" x="514" y="52" width="52" height="52"/><use href="#i-server" x="606" y="52" width="52" height="52"/><use href="#i-server" x="698" y="52" width="52" height="52"/>
+              <use href="#i-server" x="330" y="128" width="52" height="52"/><use href="#i-server" x="422" y="128" width="52" height="52"/><use href="#i-server" x="514" y="128" width="52" height="52"/><use href="#i-server" x="606" y="128" width="52" height="52"/><use href="#i-server" x="698" y="128" width="52" height="52"/>
+            </g>
+            <text x="330" y="212" class="lbl dim">10 Linux servers</text>
+            <path d="M322 226h470" class="dash soft"/>
+            <g id="sc-ssh">
+              <circle class="ring" cx="366" cy="330" r="48"/>
+              <use href="#i-terminal" x="336" y="300" width="60" height="60"/>
+              <text x="366" y="398" text-anchor="middle" class="lbl">SSH admin</text>
+            </g>
+            <g id="sc-db"><use href="#i-db" x="500" y="300" width="60" height="60"/><text x="530" y="398" text-anchor="middle" class="lbl dim">Database</text></g>
+            <g id="sc-web"><use href="#i-web" x="650" y="300" width="60" height="60"/><text x="680" y="398" text-anchor="middle" class="lbl dim">Web app</text></g>
+          </g>
+          <g id="sc-flow"></g>
+          <text id="sc-count" x="85" y="272" text-anchor="middle" class="count">attempts: 0</text>
+        </svg>
+        <div class="qb qb1" data-step="4"><svg class="ic"><use href="#i-search"/></svg> Who is it?</div>
+        <div class="qb qb2" data-step="4"><svg class="ic"><use href="#i-playbook"/></svg> What are they trying?</div>
+        <div class="qb qb3" data-step="4"><svg class="ic"><use href="#i-terminal"/></svg> What if they get in?</div>
+      </div>
+      <aside class="sc-say">
+        <div class="say" data-step="1"><b>A company</b><span>10 Linux servers, a database server, a web application server and an SSH administration server.</span></div>
+        <div class="say" data-step="2"><b>One day&hellip;</b><span>An unknown IP address keeps trying different credentials on the SSH server.</span></div>
+        <div class="say alert" data-step="3"><b><svg class="ic"><use href="#i-bell"/></svg> The security team notices</b><span><em id="sc-n">0</em> failed logins. They need answers, fast.</span></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ================================== 03 QUESTIONS ================================== -->
+  <section class="slide" id="questions" data-title="Three questions">
+    <header class="head">
+      <div class="kicker"><b>03</b> &middot; What the company wants to know</div>
+      <h1 class="t">Three questions</h1>
+    </header>
+    <div class="qrow">
+      <article class="qcard" data-step="1" tabindex="0">
+        <div class="qinner">
+          <div class="qface front"><span class="qnum">01</span><svg class="ic xl"><use href="#i-hacker"/></svg><h2>Who?</h2><p>Who is trying to access our infrastructure?</p><span class="hint">click to flip</span></div>
+          <div class="qface back"><h3>We answer with</h3><ul><li><svg class="ic"><use href="#i-globe"/></svg> a world map of attackers</li><li><svg class="ic"><use href="#i-pin"/></svg> IP, country, history</li></ul><span class="hint">Slide 11</span></div>
+        </div>
+      </article>
+      <article class="qcard" data-step="2" tabindex="0">
+        <div class="qinner">
+          <div class="qface front"><span class="qnum">02</span><svg class="ic xl"><use href="#i-playbook"/></svg><h2>How?</h2><p>What techniques are they using?</p><span class="hint">click to flip</span></div>
+          <div class="qface back"><h3>We answer with</h3><ul><li><svg class="ic"><use href="#i-shield"/></svg> 11 detection rules</li><li><svg class="ic"><use href="#i-bell"/></svg> alerts with severity</li></ul><span class="hint">Slides 12-13</span></div>
+        </div>
+      </article>
+      <article class="qcard" data-step="3" tabindex="0">
+        <div class="qinner">
+          <div class="qface front"><span class="qnum">03</span><svg class="ic xl"><use href="#i-terminal"/></svg><h2>Then?</h2><p>What happens after they gain access to a simulated environment?</p><span class="hint">click to flip</span></div>
+          <div class="qface back"><h3>We answer with</h3><ul><li><svg class="ic"><use href="#i-shell"/></svg> Cowrie's fake shell</li><li><svg class="ic"><use href="#i-clock"/></svg> a replay of the session</li></ul><span class="hint">Slide 14</span></div>
+        </div>
+      </article>
+    </div>
+    <div class="bigline" data-step="4">We answer all three &mdash; <span class="accent">without risking a single real server.</span></div>
+  </section>
+
+  <!-- ================================== 04 HONEYPOT ================================== -->
+  <section class="slide" id="honeypot" data-title="Key term: honeypot">
+    <header class="head">
+      <div class="kicker"><b>04</b> &middot; Key term</div>
+      <h1 class="t"><svg class="ic hi"><use href="#i-honeypot"/></svg> Honeypot</h1>
+    </header>
+    <div class="two hp">
+      <div class="hp-left">
+        <p class="lead">A <b>decoy system</b> that looks real, but that nobody legitimate has any reason to use.</p>
+        <div class="analogy" data-step="1"><span class="tag">Analogy</span>A wallet left on a table, with a hidden camera. An honest person walks past. Whoever touches it is exactly who you wanted to see.</div>
+        <div class="trio" data-step="2">
+          <div><svg class="ic"><use href="#i-alert"/></svg><span>Any connection is suspicious</span></div>
+          <div><svg class="ic"><use href="#i-eye"/></svg><span>Every move is recorded</span></div>
+          <div><svg class="ic"><use href="#i-shield"/></svg><span>Nothing real is at risk</span></div>
+        </div>
+      </div>
+      <div class="hp-right">
+        <svg id="hp-scene" viewBox="0 0 560 330" role="img" aria-label="A thief reaches for a wallet; a hidden camera records it">
+          <g id="hp-cam"><use href="#i-camera" x="440" y="14" width="86" height="86"/><circle class="rec" cx="512" cy="36" r="5"/><text x="483" y="116" text-anchor="middle" class="tiny">hidden camera</text></g>
+          <path d="M455 100L400 214" class="dash soft"/>
+          <rect x="120" y="262" width="360" height="12" rx="4" class="table"/><path d="M150 274v40M450 274v40" class="table-leg"/>
+          <g id="hp-bait" transform="translate(300 214)"><rect width="96" height="48" rx="9" class="wallet"/><path d="M62 0v48" class="wallet-line"/><circle cx="78" cy="24" r="5" class="wallet-clasp"/><text x="28" y="31" class="coin">$</text></g>
+          <text x="348" y="298" text-anchor="middle" class="tiny">bait</text>
+          <g id="hp-thief"><use href="#i-hacker" x="0" y="196" width="104" height="104" class="red"/></g>
+          <circle id="hp-flash" cx="350" cy="238" r="0"/>
+          <g id="hp-stamp"><rect x="150" y="70" width="230" height="52" rx="6"/><text x="265" y="106" text-anchor="middle">CAUGHT</text></g>
+        </svg>
+        <div class="hp-foot"><button class="btn" id="hp-btn">&#9654; Touch the bait</button><div id="hp-log" class="mini-log"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================== 05 COWRIE ================================== -->
+  <section class="slide" id="cowrie" data-title="Key term: Cowrie">
+    <header class="head">
+      <div class="kicker"><b>05</b> &middot; Key term</div>
+      <h1 class="t"><svg class="ic hi"><use href="#i-shell"/></svg> Cowrie</h1>
+    </header>
+    <div class="two cw">
+      <div class="cw-left">
+        <p class="lead">A ready-made, open-source <b>SSH honeypot</b>. It records. It does not analyse.</p>
+        <ul class="facts">
+          <li data-step="1"><svg class="ic"><use href="#i-terminal"/></svg><span>Listens on port <b>2222</b> &mdash; the real SSH stays on 22</span></li>
+          <li data-step="2"><svg class="ic"><use href="#i-shell"/></svg><span>Gives attackers a <b>fake shell</b>: every answer is invented</span></li>
+          <li data-step="3"><svg class="ic"><use href="#i-file"/></svg><span>Saves every action as a <b>JSON log</b></span></li>
+          <li data-step="4"><svg class="ic"><use href="#i-shield"/></svg><span>Attackers <b>never touch a real system</b></span></li>
+        </ul>
+        <div class="credit" data-step="5"><svg class="ic"><use href="#i-plug"/></svg><span>Not our code. <b>SSH Sentinel</b> is built on top of it.</span></div>
+      </div>
+      <div class="cw-right">
+        <div class="cw-title">Try it &mdash; you are the attacker</div>
+        <div class="term">
+          <div class="term-head"><i></i><i></i><i></i><span>root@svr04 &mdash; fake shell (Cowrie)</span></div>
+          <div class="term-body" id="tb"></div>
+          <form class="term-in" id="tf" autocomplete="off"><span class="ps1">root@svr04:~#</span><input id="ti" spellcheck="false" aria-label="type a command"></form>
+        </div>
+        <div class="cmdchips" id="cmdchips">
+          <button class="chipbtn" data-cmd="whoami">whoami</button><button class="chipbtn" data-cmd="uname -a">uname -a</button><button class="chipbtn" data-cmd="ls">ls</button><button class="chipbtn" data-cmd="cat /etc/passwd">cat /etc/passwd</button><button class="chipbtn" data-cmd="wget http://example.invalid/x">wget&hellip;</button>
+        </div>
+        <div class="rec-title"><svg class="ic"><use href="#i-eye"/></svg> What Cowrie records</div>
+        <div class="reclog" id="reclog"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================== 06 VOCABULARY ================================== -->
+  <section class="slide" id="vocab" data-title="Attack vocabulary">
+    <header class="head">
+      <div class="kicker"><b>06</b> &middot; Key terms &middot; the attacker's vocabulary</div>
+      <h1 class="t">Five words you will hear</h1>
+    </header>
+    <div class="vtiles" id="vtiles">
+      <button class="vtile" data-step="1" data-v="brute"><svg class="ic xl"><use href="#i-hammer"/></svg><b>Brute force</b><span>Try every possible combination until one works.</span></button>
+      <button class="vtile" data-step="2" data-v="dict"><svg class="ic xl"><use href="#i-book"/></svg><b>Dictionary attack</b><span>Try the most common passwords first.</span></button>
+      <button class="vtile" data-step="3" data-v="spray"><svg class="ic xl"><use href="#i-spray"/></svg><b>Password spraying</b><span>One password, tried on many accounts.</span></button>
+      <button class="vtile" data-step="4" data-v="enum"><svg class="ic xl"><use href="#i-search"/></svg><b>Username enumeration</b><span>Probe which usernames actually exist.</span></button>
+      <button class="vtile" data-step="5" data-v="session"><svg class="ic xl"><use href="#i-session"/></svg><b>SSH session</b><span>One connection, from connect to close.</span></button>
+    </div>
+    <div class="vdemo panel" id="vdemo"><div class="vd-empty">Press &rarr; to meet the first one</div></div>
+  </section>
+
+  <!-- ================================== 07 PROBLEM ================================== -->
+  <section class="slide" id="problem" data-title="The problem">
+    <header class="head">
+      <div class="kicker"><b>07</b> &middot; The problem</div>
+      <h1 class="t">A honeypot gives you <span class="red">logs</span>, not answers</h1>
+    </header>
+    <div class="logwall panel">
+      <div class="logscroll" id="logscroll"></div>
+      <div class="lw-badge" data-step="1"><svg class="ic"><use href="#i-file"/></svg> <em id="lw-n">12,408</em> events today</div>
+      <div class="lw-shade"></div>
+      <div class="lw-q" data-step="2">
+        <div><svg class="ic"><use href="#i-hacker"/></svg>Who attacked?</div>
+        <div><svg class="ic"><use href="#i-key"/></svg>Who got in?</div>
+        <div><svg class="ic"><use href="#i-terminal"/></svg>What did they do?</div>
+      </div>
+    </div>
+    <div class="bigline" data-step="3">Nobody can read this at scale. <span class="accent">We need a tool that turns logs into answers.</span></div>
+  </section>
+
+  <!-- ================================== 08 VERSUS ================================== -->
+  <section class="slide" id="versus" data-title="Why a honeypot, not just a firewall?">
+    <header class="head">
+      <div class="kicker"><b>08</b> &middot; A fair question</div>
+      <h1 class="t">Why a honeypot, not just a firewall?</h1>
+    </header>
+    <div class="vs">
+      <div class="vs-col fw" id="vs-fw">
+        <div class="vs-top"><svg class="ic"><use href="#i-firewall"/></svg><div><b>Firewall</b><small>the locked door</small></div></div>
+        <div class="lane"><svg class="ic atk"><use href="#i-hacker"/></svg><i class="pkt" id="fw-pkt"></i><svg class="ic wall"><use href="#i-firewall"/></svg><span class="stamp bad" id="fw-stamp">BLOCKED</span></div>
+        <div class="vs-log" id="fw-log"></div>
+        <div class="vs-learn" id="fw-learn">You learn: <b>one log line</b></div>
+      </div>
+      <div class="vs-btn"><button class="btn" id="vs-go">&#9654; Launch attack</button></div>
+      <div class="vs-col hp" id="vs-hp">
+        <div class="vs-top"><svg class="ic"><use href="#i-honeypot"/></svg><div><b>Honeypot</b><small>the decoy room with a camera</small></div></div>
+        <div class="lane"><svg class="ic atk"><use href="#i-hacker"/></svg><i class="pkt" id="hp-pkt"></i><svg class="ic room"><use href="#i-camera"/></svg></div>
+        <div class="vs-log" id="hp-log2"></div>
+        <div class="vs-learn" id="hp-learn">You learn: <b>the attacker's whole playbook</b></div>
+      </div>
+    </div>
+    <div class="adv" data-step="2">
+      <div><svg class="ic"><use href="#i-check"/></svg><b>Almost no false alarms</b><span>nobody legitimate uses it</span></div>
+      <div><svg class="ic"><use href="#i-terminal"/></svg><b>Sees what happens after login</b><span>every command typed</span></div>
+      <div><svg class="ic"><use href="#i-cube"/></svg><b>Safe to study</b><span>a fake shell, nothing real</span></div>
+      <div><svg class="ic"><use href="#i-bell"/></svg><b>Early warning</b><span>check the real servers</span></div>
+    </div>
+    <div class="caveat" data-step="3">They work <b>together</b>. A honeypot sees only attacks aimed at it &mdash; it complements real defences, it does not replace them.</div>
+  </section>
+
+  <!-- ================================== 09 SOLUTION ================================== -->
+  <section class="slide" id="solution" data-title="The solution: SSH Sentinel">
+    <header class="head">
+      <div class="kicker"><b>09</b> &middot; Our solution</div>
+      <h1 class="t">SSH<span class="accent">Sentinel</span> <span class="dimh">&mdash; Cowrie records, Sentinel makes sense of it</span></h1>
+    </header>
+    <div class="sol">
+      <div class="sol-raw" id="sol-raw"></div>
+      <div class="sol-core"><div class="core-ring"><svg class="ic"><use href="#i-shield"/></svg></div></div>
+      <div class="sol-out" id="sol-out">
+        <div class="stat"><em data-to="16">0</em><span>attacker IPs</span></div>
+        <div class="stat"><em data-to="124">0</em><span>failed logins</span></div>
+        <div class="stat hot"><em data-to="46">0</em><span>alerts raised</span></div>
+        <div class="stat"><em data-to="15">0</em><span>countries</span></div>
+      </div>
+    </div>
+    <div class="verbs" data-step="1">
+      <div class="verb"><svg class="ic"><use href="#i-file"/></svg><b>COLLECT</b><span>read the honeypot log</span></div>
+      <span class="varrow">&rarr;</span>
+      <div class="verb"><svg class="ic"><use href="#i-shield"/></svg><b>DETECT</b><span>11 rules find attack patterns</span></div>
+      <span class="varrow">&rarr;</span>
+      <div class="verb"><svg class="ic"><use href="#i-eye"/></svg><b>UNDERSTAND</b><span>map, charts, alerts, sessions</span></div>
+    </div>
+  </section>
+
+  <!-- ================================== 10 ARCHITECTURE ================================== -->
+  <section class="slide" id="arch" data-title="Architecture">
+    <header class="head">
+      <div class="kicker"><b>10</b> &middot; Architecture &middot; the two-machine lab</div>
+      <h1 class="t">From one login attempt to one dashboard</h1>
+    </header>
+    <div class="pipe" id="pipe">
+      <button class="pn" data-i="0"><svg class="ic"><use href="#i-laptop"/></svg><b>Attacker PC</b><small>hydra &middot; ssh</small></button>
+      <span class="pa"><i></i></span>
+      <button class="pn" data-i="1"><svg class="ic"><use href="#i-shell"/></svg><b>Cowrie</b><small>honeypot :2222</small></button>
+      <span class="pa"><i></i></span>
+      <button class="pn" data-i="2"><svg class="ic"><use href="#i-file"/></svg><b>Collector</b><small>reads the log</small></button>
+      <span class="pa"><i></i></span>
+      <button class="pn" data-i="3"><svg class="ic"><use href="#i-db"/></svg><b>Database</b><small>SQLite</small></button>
+      <span class="pa"><i></i></span>
+      <div class="pstack">
+        <button class="pn sm" data-i="4"><svg class="ic"><use href="#i-shield"/></svg><b>Detection</b><small>11 rules</small></button>
+        <button class="pn sm" data-i="5"><svg class="ic"><use href="#i-globe"/></svg><b>Geolocation</b><small>IP &rarr; place</small></button>
+      </div>
+      <span class="pa"><i></i></span>
+      <button class="pn" data-i="6"><svg class="ic"><use href="#i-plug"/></svg><b>API</b><small>Flask</small></button>
+      <span class="pa"><i></i></span>
+      <button class="pn" data-i="7"><svg class="ic"><use href="#i-web"/></svg><b>Dashboard</b><small>map &middot; alerts</small></button>
+      <div class="brk brk-a"><span>ATTACKER machine</span></div>
+      <div class="brk brk-b"><span>SERVER machine &mdash; same network</span></div>
+      <i class="pdot" id="pdot"></i>
+    </div>
+    <div class="pcap" id="pcap"><button class="btn" id="pplay">&#9654; Follow one login attempt</button><code id="pcap-t">Click any block to see what it does.</code></div>
+    <div class="pdetail panel" id="pdetail"><h3 id="pd-h">&nbsp;</h3><p id="pd-p"></p><small id="pd-f"></small></div>
+  </section>
+
+  <!-- ================================== 11 Q1 WHO ================================== -->
+  <section class="slide" id="q1" data-title="Question 1: Who?">
+    <header class="head">
+      <div class="kicker"><span class="qbadge">Question 1</span> &middot; Who is trying to access our infrastructure?</div>
+      <h1 class="t">Who? <span class="dimh">&mdash; every attacker, placed on the map</span></h1>
+    </header>
+    <div class="two q1">
+      <div class="panel mapbox">
+        <canvas id="map" width="1500" height="600"></canvas>
+        <div id="map-tip" class="map-tip hidden"></div>
+        <div class="map-leg"><span><i></i> bubble size = events</span></div>
+      </div>
+      <div class="q1-side">
+        <div class="panel table-p"><table id="q1-table"></table></div>
+        <div class="lan" data-step="1"><svg class="ic"><use href="#i-laptop"/></svg><span>Our lab attacker has a <b>private IP</b> (192.168.x.x): it has no place on a world map, so it shows as <b>"Private network"</b>.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================== 12 Q2 RULES ================================== -->
+  <section class="slide" id="q2" data-title="Question 2: Techniques">
+    <header class="head">
+      <div class="kicker"><span class="qbadge">Question 2</span> &middot; What techniques are they using?</div>
+      <h1 class="t">11 rules that recognise an attack <span class="dimh">&mdash; 4 are new</span></h1>
+    </header>
+    <div class="two q2">
+      <div class="q2-left">
+        <div class="rules" id="rules"></div>
+        <div class="rdetail panel" id="rdetail"><span class="rd-hint">Click a rule</span></div>
+      </div>
+      <div class="q2-right panel">
+        <div class="pg-title"><svg class="ic"><use href="#i-sliders"/></svg> Try the detector</div>
+        <div class="pg-sub">Failed logins from one IP in the last <b>30 seconds</b></div>
+        <div class="pg-num"><em id="pg-n">0</em></div>
+        <input type="range" min="0" max="14" value="0" id="pg-range" aria-label="failed logins in 30 seconds">
+        <div class="pg-scale"><span style="--p:35.7%">5</span><span style="--p:71.4%">10</span></div>
+        <div class="pg-lamps">
+          <div class="lamp" id="lamp-bf"><i></i><div><b>brute_force</b><small>5 failures &middot; medium</small></div></div>
+          <div class="lamp" id="lamp-ra"><i></i><div><b>rapid_attack</b><small>10 failures &middot; high</small></div></div>
+        </div>
+        <button class="btn" id="pg-sim">&#9654; Simulate an attack</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================== 13 BOTNET ================================== -->
+  <section class="slide" id="botnet" data-title="The botnet rule">
+    <header class="head">
+      <div class="kicker"><span class="qbadge">Question 2</span> &middot; the rule that sees what the others miss</div>
+      <h1 class="t">distributed_attack <span class="dimh">&mdash; one botnet, four IPs</span></h1>
+    </header>
+    <div class="bn">
+      <div class="bn-toggle"><button class="btn on" id="bn-a">Per-IP view</button><button class="btn" id="bn-b">Cross-IP view</button></div>
+      <div class="bn-cards" id="bn-cards"></div>
+      <svg class="bn-lines" id="bn-lines" viewBox="0 0 1184 120" preserveAspectRatio="none"></svg>
+      <div class="bn-banner" id="bn-banner">
+        <div class="bn-quiet"><svg class="ic"><use href="#i-check"/></svg> Every IP stays under the threshold (5) &mdash; <b>no alert</b>. Looks harmless&hellip;</div>
+        <div class="bn-alert"><svg class="ic"><use href="#i-alert"/></svg><div><b>distributed_attack &middot; HIGH</b><span>4 IPs tried the <em>same 4 credentials</em> in the same 10 minutes &rarr; a coordinated botnet</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================== 14 Q3 AFTER ================================== -->
+  <section class="slide" id="q3" data-title="Question 3: After they get in">
+    <header class="head">
+      <div class="kicker"><span class="qbadge">Question 3</span> &middot; What happens after they gain access?</div>
+      <h1 class="t">Then? <span class="dimh">&mdash; watching the attacker work</span></h1>
+    </header>
+    <div class="two q3">
+      <div class="q3-left">
+        <div class="term big">
+          <div class="term-head"><i></i><i></i><i></i><span>session a3f91c0d22b1 &mdash; 192.0.2.88 &mdash; Cowrie fake shell</span></div>
+          <div class="term-body" id="rp-body"></div>
+        </div>
+        <div class="rp-ctrl"><button class="btn" id="rp-play">&#9654; Replay</button><input type="range" id="rp-range" min="0" max="10" value="0" aria-label="scrub the session"><span class="rp-note">nothing real was touched</span></div>
+      </div>
+      <div class="q3-right">
+        <div class="threat panel"><div class="th-title">Threat level</div><div class="th-bar" id="th-bar"><i></i><i></i><i></i><i></i></div><div class="th-lbl" id="th-lbl">quiet</div></div>
+        <div class="alerts panel"><div class="th-title"><svg class="ic"><use href="#i-bell"/></svg> What Sentinel flags</div><div id="rp-alerts"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================== 15 DEMO ================================== -->
+  <section class="slide s-demo" id="demo" data-title="Live demo">
+    <header class="head">
+      <div class="kicker"><b>15</b> &middot; Live demo</div>
+      <h1 class="t">Let's attack our own honeypot</h1>
+    </header>
+    <div class="dm">
+      <div class="dm-box a"><svg class="ic xl"><use href="#i-laptop"/></svg><b>ATTACKER</b><small>our friend's PC</small></div>
+      <div class="dm-link"><span>same network</span><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="dm-box b"><svg class="ic xl"><use href="#i-shell"/></svg><b>SERVER</b><small>Cowrie + SSH Sentinel</small></div>
+    </div>
+    <div class="dm-steps">
+      <div><span>1</span>The attacker scans, guesses passwords, logs in</div>
+      <div><span>2</span>Sentinel reads the log and raises alerts</div>
+      <div><span>3</span>We read the story on the dashboard</div>
+    </div>
+    <div class="dm-links">
+      <a class="btn" href="http://127.0.0.1:5000" target="_blank" rel="noopener">Open the live dashboard</a>
+      <a class="btn ghost" href="http://127.0.0.1:5001" target="_blank" rel="noopener">Open the demo-mode dashboard</a>
+    </div>
+  </section>
+
+  <!-- ================================== 16 CLOSE ================================== -->
+  <section class="slide" id="close" data-title="From detection to action">
+    <header class="head">
+      <div class="kicker"><b>16</b> &middot; Back to our company</div>
+      <h1 class="t">From detection to action</h1>
+    </header>
+    <div class="cl">
+      <div class="cl-ring">
+        <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="rg-bg"/><circle cx="60" cy="60" r="52" class="rg-fg" id="rg-fg"/></svg>
+        <div class="rg-txt"><em id="rg-n">0</em><span>/ 6 done</span></div>
+        <div class="rg-sub">The team can&hellip;</div>
+      </div>
+      <div class="acts" id="acts"></div>
+    </div>
+    <div class="thanks" data-step="7" id="thanks">
+      <div class="th-glow"></div>
+      <svg class="ic xxl"><use href="#i-shield"/></svg>
+      <h2>Thank you</h2>
+      <div class="th-q">Questions?</div>
+      <div class="th-names"><span>Safia Lounassi</span><span>Ourda Ghanem</span><span>Amroun Maanel</span></div>
+    </div>
+  </section>
+
+  <footer class="chrome-foot">
+    <div class="brand">&gt;_ SSH<span class="accent">SENTINEL</span></div>
+    <div class="hint-keys" id="hintkeys">&larr; &rarr; navigate &nbsp;&middot;&nbsp; O overview &nbsp;&middot;&nbsp; F fullscreen</div>
+    <div class="counter"><span id="counter">01 / 16</span></div>
+  </footer>
+  <button class="navbtn prev" id="prev" aria-label="Previous">&lsaquo;</button>
+  <button class="navbtn next" id="next" aria-label="Next">&rsaquo;</button>
+</div>
+</div>
+
+<div id="overview" class="hidden" aria-label="Slide overview"><div class="ov-title">Slides &mdash; click to jump (Esc to close)</div><div class="ov-grid" id="ov-grid"></div></div>
+
+<script src="js/worldmap.js"></script>
+<script src="js/deck.js"></script>
+<script src="js/slides-1.js"></script>
+<script src="js/slides-2.js"></script>
+<script src="js/slides-3.js"></script>
+<script>Deck.start();</script>
+</body>
+</html>

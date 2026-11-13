@@ -30,3 +30,13 @@ def test_partial_line_and_resume(tmp_path):
     assert len(reader.read_new_events()) == 0           
     log.write_text(GOOD + "\n" + GOOD + "\n")           
     assert len(reader.read_new_events()) == 1
+
+
+def test_session_duration_accepts_seconds_and_ms():
+    base = {"eventid": "cowrie.session.closed", "timestamp": "2026-11-05T10:00:00Z",
+            "src_ip": "10.0.0.5", "session": "abc"}
+    assert parse_line(json.dumps({**base, "duration": 12.5}))["duration_s"] == 12.5
+    assert parse_line(json.dumps({**base, "duration": "7.25"}))["duration_s"] == 7.25
+    assert parse_line(json.dumps({**base, "duration_ms": 4000}))["duration_s"] == 4.0
+    assert parse_line(json.dumps(base))["duration_s"] is None
+

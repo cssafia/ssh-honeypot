@@ -99,3 +99,10 @@ def test_dashboard_page_and_csp(client):
     assert "script-src 'self'" in r.headers["Content-Security-Policy"]
     assert client.get("/static/css/style.css").status_code == 200
     assert client.get("/static/js/app.js").status_code == 200
+
+
+def test_honeypot_status_demo_flag(client, monkeypatch):
+    assert client.get("/api/honeypot/status").get_json()["demo"] is False
+    monkeypatch.setenv("SENTINEL_DEMO", "1")
+    assert client.get("/api/honeypot/status").get_json()["demo"] is True
+

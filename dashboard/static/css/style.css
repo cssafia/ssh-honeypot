@@ -29,6 +29,7 @@ nav a { color: var(--muted); } nav a:hover { color: var(--green); }
 .status { display: flex; align-items: center; gap: 8px; font-size: 12px; white-space: nowrap; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); display: inline-block; }
 .dot.up { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.dot.demo { background: #e0b040; box-shadow: 0 0 8px #e0b040; }
 .dot.down { background: var(--red); box-shadow: 0 0 8px var(--red); }
 
 /* panels and layout */
@@ -41,6 +42,13 @@ section { margin-bottom: 16px; }
 .toggle { display: flex; gap: 6px; }
 .chart-box { position: relative; height: 280px; }
 .chart-box.small { height: 240px; }
+
+/* map */
+.map-box { position: relative; background: #0e1210; border: 1px solid var(--line); }
+.map-box canvas { display: block; width: 100%; }
+.map-tip { position: absolute; pointer-events: none; z-index: 5; background: var(--panel-2);
+           border: 1px solid var(--green-dim); padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+.map-note { margin: 8px 0 0; font-size: 12px; }
 
 /* cards */
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }

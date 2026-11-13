@@ -4,7 +4,7 @@ import json
 from collections import Counter, defaultdict
 
 from database.db import DEFAULT_DB, init_db, transaction
-from detection.detection_rules import run_rules
+from detection.detection_rules import run_global_rules, run_rules
 
 EVENT_COLUMNS = ("event_id, source_ip, username, password_masked, password_hash, "
                  "command, timestamp, event_type, session_id")
@@ -22,6 +22,7 @@ def run_detection(db_path=DEFAULT_DB, config=None) -> dict:
     found, new = [], 0
     for ip, events in by_ip.items():
         found += run_rules(ip, events, config)
+    found += run_global_rules(by_ip, config)
 
     with transaction(db_path) as conn:
         for a in found:

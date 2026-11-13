@@ -1,6 +1,7 @@
 import csv
 import io
 import ipaddress
+import os
 from datetime import datetime, timezone
 
 from flask import Blueprint, Response, current_app, jsonify, render_template, request
@@ -146,7 +147,7 @@ def health():
 def honeypot_status():
     last = _query("SELECT MAX(timestamp) AS t FROM attacks")[0]["t"]
     return jsonify(port=HONEYPOT_PORT, listening=_port_listening(HONEYPOT_PORT),
-                   last_event=last)
+                   last_event=last, demo=os.environ.get("SENTINEL_DEMO") == "1")
 
 
 # ------------------------------------------------------------- statistics
@@ -161,7 +162,7 @@ def attackers():
     f = _filters()
     attacks = st.load_attacks(_db(), f["start"], f["end"], f["ip"])
     alerts = st.load_alerts(_db(), f["ip"])
-    return jsonify(st.top_ips(attacks, alerts, _int("limit", 10, 1, 100)))
+    return jsonify(st.top_ips(attacks, alerts, _int("limit", 10, 1, 100), st.load_geo(_db())))
 
 
 @bp.get("/api/credentials")
@@ -179,6 +180,13 @@ def timeline():
     freq = {"hour": "h", "day": "D"}[_choice("by", {"hour", "day"}) or "hour"]
     attacks = st.load_attacks(_db(), f["start"], f["end"], f["ip"])
     return jsonify(st.attempts_over_time(attacks, freq))
+
+
+@bp.get("/api/geo")
+def geo():
+    f = _filters()
+    attacks = st.load_attacks(_db(), f["start"], f["end"], f["ip"])
+    return jsonify(st.geo_summary(attacks, st.load_geo(_db())))
 
 
 @bp.get("/api/sessions")

@@ -72,6 +72,11 @@ const baseOpts = { responsive: true, maintainAspectRatio: false };
 async function loadStatus() {
   const r = await fetch("/api/honeypot/status");
   const s = await r.json();
+  if (s.demo) {
+    $("hp-dot").className = "dot demo";
+    $("hp-text").textContent = "DEMO MODE - simulated attacks";
+    return;
+  }
   $("hp-dot").className = "dot " + (s.listening ? "up" : "down");
   $("hp-text").textContent = s.listening
     ? `Honeypot listening :${s.port}`
@@ -89,8 +94,8 @@ async function loadSummary() {
   $("c-alerts").textContent = o.total_alerts;
 
   renderTable("t-attackers",
-    ["IP", "Failed", "Events", "First seen", "Last seen", "Alert severity"],
-    s.top_ips.map((i) => [i.source_ip, i.failed_logins, i.events,
+    ["IP", "Country", "Failed", "Events", "First seen", "Last seen", "Alert severity"],
+    s.top_ips.map((i) => [i.source_ip, i.country, i.failed_logins, i.events,
                           fmt(i.first_seen), fmt(i.last_seen), badge(i.max_severity)]),
     (i) => { $("ip").value = s.top_ips[i].source_ip; refreshAll(); });
 
@@ -102,6 +107,9 @@ async function loadSummary() {
     options: { ...baseOpts, indexAxis: "y", plugins: { legend: { display: false } },
                scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } },
   });
+
+  state.geo = s.geo;
+  renderGeo();
 
   renderTable("t-passwords", ["Password (masked)", "Attempts"],
     s.top_passwords.map((p) => [p.password_masked, p.count]));
@@ -136,6 +144,100 @@ async function loadTimeline() {
                y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } },
   });
 }
+
+// ---- attack map: a world outline drawn on a canvas (no external map service) ----
+function geoPoint(p, w, h) {
+  const m = window.WORLD_MAP;
+  return [((p.lon + 180) / m.width) * w, ((m.top - p.lat) / m.height) * h];
+}
+
+function renderGeo() {
+  const g = state.geo;
+  if (!g) return;
+  const canvas = $("map-canvas");
+  const m = window.WORLD_MAP;
+  const w = canvas.parentElement.clientWidth || 600;
+  const h = Math.round((w * m.height) / m.width);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.height = h + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = "#1a201d";                      // graticule every 30 degrees
+  ctx.lineWidth = 1;
+  for (let lon = -150; lon <= 150; lon += 30) {
+    const x = ((lon + 180) / m.width) * w;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+  for (let lat = -30; lat <= 60; lat += 30) {
+    const y = ((m.top - lat) / m.height) * h;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  ctx.save();
+  ctx.scale(w / m.width, h / m.height);
+  const land = new Path2D(m.path);
+  ctx.fillStyle = "#1c2520";
+  ctx.lineWidth = 0.25;
+  ctx.strokeStyle = "#2f3d35";
+  for (const dx of [-360, 0, 360]) {            // shapes that cross the date line wrap around
+    ctx.save();
+    ctx.translate(dx, 0);
+    ctx.fill(land);
+    ctx.stroke(land);
+    ctx.restore();
+  }
+  ctx.restore();
+
+  const max = Math.max(1, ...g.points.map((p) => p.events));          // bubble size = total events
+  state.bubbles = g.points.map((p) => {
+    const [x, y] = geoPoint(p, w, h);
+    const r = 4 + 12 * Math.sqrt(p.events / max);
+    return { x, y, r, p };
+  });
+  for (const b of state.bubbles) {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(57, 255, 20, 0.22)";
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = GREEN;
+    ctx.stroke();
+  }
+  if (!g.points.length) {
+    ctx.fillStyle = "#7d8782";
+    ctx.font = "13px " + Chart.defaults.font.family;
+    ctx.textAlign = "center";
+    ctx.fillText("No located attackers yet", w / 2, h / 2);
+  }
+
+  const notes = [];
+  if (g.private.ips) notes.push(`${g.private.ips} private-network IP(s) (LAN lab) with ${g.private.failed_logins} failed logins have no map location.`);
+  if (g.unlocated.ips) notes.push(`${g.unlocated.ips} IP(s) not located yet.`);
+  $("map-note").textContent = notes.join(" ");
+
+  renderTable("t-countries", ["Country", "IPs", "Failed", "Events"],
+    g.countries.map((c) => [c.country, c.ips, c.failed_logins, c.events]));
+}
+
+$("map-canvas").addEventListener("mousemove", (e) => {
+  const tip = $("map-tip");
+  const rect = e.target.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const hit = (state.bubbles || []).find((b) => Math.hypot(b.x - x, b.y - y) <= b.r + 2);
+  tip.classList.toggle("hidden", !hit);
+  if (!hit) return;
+  const p = hit.p;
+  tip.textContent = `${p.ip} - ${p.city ? p.city + ", " : ""}${p.country} - ${p.events} events, ${p.failed_logins} failed logins`;
+  tip.style.left = Math.min(x + 12, rect.width - tip.offsetWidth - 4) + "px";
+  tip.style.top = Math.max(y - 30, 4) + "px";
+});
+$("map-canvas").addEventListener("mouseleave", () => $("map-tip").classList.add("hidden"));
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderGeo, 150); });
 
 function statusSelect(alert) {
   const options = ["open", "investigating", "closed", "false_positive"]

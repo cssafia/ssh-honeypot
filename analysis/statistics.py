@@ -49,6 +49,10 @@ def load_sessions(db_path=DEFAULT_DB, ip=None) -> pd.DataFrame:
     return _read(sql, params, db_path)
 
 
+def load_geo(db_path=DEFAULT_DB) -> pd.DataFrame:
+    return _read("SELECT * FROM ip_geo", [], db_path)
+
+
 def _iso(series):
     return series.dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -65,7 +69,7 @@ def overview(attacks, alerts) -> dict:
     }
 
 
-def top_ips(attacks, alerts, limit=10) -> list:
+def top_ips(attacks, alerts, limit=10, geo=None) -> list:
     if attacks.empty:
         return []
     g = attacks.groupby("source_ip").agg(
@@ -88,7 +92,54 @@ def top_ips(attacks, alerts, limit=10) -> list:
 
     g = g.sort_values(["failed_logins", "events"], ascending=False).head(limit).reset_index()
     g["first_seen"], g["last_seen"] = _iso(g["first_seen"]), _iso(g["last_seen"])
+    g["country"] = g["source_ip"].map(_country_names(geo)).fillna("-")
     return g.to_dict("records")
+
+
+def _country_names(geo) -> dict:
+    if geo is None or geo.empty:
+        return {}
+    return {r.ip: (r.country if r.country else "Unknown") for r in geo.itertuples()}
+
+
+def geo_summary(attacks, geo) -> dict:
+    """Attack origins: bubbles for the map, a country ranking, and LAN / unlocated counts."""
+    empty = {"countries": [], "points": [], "private": {"ips": 0, "events": 0, "failed_logins": 0},
+             "unlocated": {"ips": 0, "events": 0}}
+    if attacks.empty:
+        return empty
+    per_ip = attacks.groupby("source_ip").agg(events=("event_id", "count"))
+    per_ip["failed_logins"] = (attacks[attacks["event_type"] == "login_failed"]
+                               .groupby("source_ip").size().reindex(per_ip.index, fill_value=0))
+    per_ip = per_ip.reset_index()
+    geo = geo if geo is not None and not geo.empty else pd.DataFrame(
+        columns=["ip", "country", "country_code", "city", "lat", "lon", "is_private"])
+    m = per_ip.merge(geo, left_on="source_ip", right_on="ip", how="left")
+
+    unlocated = m[m["ip"].isna()]
+    private = m[m["is_private"] == 1]
+    public = m[(m["is_private"] == 0) & m["ip"].notna()]
+    located = public[public["lat"].notna()]
+    unknown = public[public["lat"].isna()]
+
+    countries = (located.groupby(["country", "country_code"], dropna=False)
+                 .agg(events=("events", "sum"), failed_logins=("failed_logins", "sum"),
+                      ips=("source_ip", "nunique"))
+                 .reset_index().sort_values(["failed_logins", "events"], ascending=False))
+    points = [{"ip": r.source_ip, "lat": float(r.lat), "lon": float(r.lon),
+               "country": r.country, "city": r.city or "",
+               "events": int(r.events), "failed_logins": int(r.failed_logins)}
+              for r in located.itertuples()]
+    return {
+        "countries": [{"country": r.country, "country_code": r.country_code,
+                       "events": int(r.events), "failed_logins": int(r.failed_logins),
+                       "ips": int(r.ips)} for r in countries.itertuples()],
+        "points": points,
+        "private": {"ips": int(len(private)), "events": int(private["events"].sum()),
+                    "failed_logins": int(private["failed_logins"].sum())},
+        "unlocated": {"ips": int(len(unlocated) + len(unknown)),
+                      "events": int(unlocated["events"].sum() + unknown["events"].sum())},
+    }
 
 
 def top_usernames(attacks, limit=10) -> list:
@@ -158,9 +209,11 @@ def summary(db_path=DEFAULT_DB, start=None, end=None, ip=None) -> dict:
     attacks = load_attacks(db_path, start, end, ip)
     alerts = load_alerts(db_path, ip)
     sessions = load_sessions(db_path, ip)
+    geo = load_geo(db_path)
     return {
         "overview": overview(attacks, alerts),
-        "top_ips": top_ips(attacks, alerts),
+        "top_ips": top_ips(attacks, alerts, geo=geo),
+        "geo": geo_summary(attacks, geo),
         "top_usernames": top_usernames(attacks),
         "top_passwords": top_passwords(attacks),
         "hourly": attempts_over_time(attacks, "h"),
