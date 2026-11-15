@@ -163,6 +163,27 @@ Tuning example (`my_config.json`): `{"brute_force": {"max_failures": 3, "window_
 `python run.py --config my_config.json`. To switch a rule off:
 `{"suspicious_commands": {"enabled": false}}` (see `disable_commands.json`).
 
+## Sending alerts to a SIEM
+
+Every new alert can also be forwarded to a SIEM (Wazuh, Splunk, Graylog, Elastic, QRadar...).
+It is off by default; turn it on with one option (or the `SENTINEL_SIEM` environment variable):
+
+```
+python run.py --siem syslog://192.168.1.50:514        # syslog over UDP, CEF payload
+python run.py --siem syslog+tcp://192.168.1.50:514    # syslog over TCP
+python run.py --siem https://splunk.lan:8088/services/collector/raw   # JSON over HTTP(S)
+python run.py --siem file:/var/log/sentinel-alerts.json   # JSON lines, for Filebeat / Wazuh to read
+```
+
+* Each alert is sent **once per target** (tracked in the `siem_sent` table). New alerts go out
+  within one cycle (default 5 s); alerts that already exist when you enable it are sent too.
+* If the SIEM is down, SSH Sentinel keeps working, prints a warning and retries on the next cycle.
+* A message carries the alert type, severity, source IP, country, description, time and status.
+  Passwords are never sent. For HTTP targets, put the token in `SENTINEL_SIEM_AUTH`
+  (for example `Splunk <hec-token>`).
+* **Test without a SIEM:** `python -m siem.listen --port 5514` prints every message it receives;
+  start SSH Sentinel with `--siem syslog://127.0.0.1:5514` in another terminal.
+
 ## Dashboard and exports
 
 Overview cards, attack timeline (hourly/daily), **attack map and top countries**, targeted

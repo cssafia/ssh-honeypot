@@ -4,6 +4,7 @@
     python run.py                 # live: watch the Cowrie log + dashboard on http://127.0.0.1:5000
     python run.py live --host 0.0.0.0    # let another machine open the dashboard (no login!)
     python run.py once            # run the analysis a single time and print a summary
+    python run.py --siem syslog://192.168.1.50:514   # also send every new alert to a SIEM
     python run.py demo            # fake attacks, no honeypot needed (great for presentations)
 
 Every cycle does: read new honeypot log lines -> store -> detect attacks -> locate IPs.
@@ -20,13 +21,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 
 
-def pipeline_once(log_path, state_path, db_path, config=None, use_geo=True) -> dict:
+def pipeline_once(log_path, state_path, db_path, config=None, use_geo=True, siem=None) -> dict:
     """One full pass. Never raises for the usual 'log not there yet' situations."""
     from collector.ingest import run as ingest_run
     from detection.detector import run_detection
     from geo.geolocate import enrich
 
-    out = {"ingest": None, "detect": None, "geo": None, "warning": None}
+    out = {"ingest": None, "detect": None, "geo": None, "siem": None, "warning": None}
     try:
         out["ingest"] = ingest_run(log_path, state_path, db_path)
     except FileNotFoundError:
@@ -37,6 +38,9 @@ def pipeline_once(log_path, state_path, db_path, config=None, use_geo=True) -> d
     out["detect"] = run_detection(db_path, config)
     if use_geo:
         out["geo"] = enrich(db_path)
+    if siem:                                           # after geo, so the country travels with the alert
+        from siem.forward import forward_new_alerts
+        out["siem"] = forward_new_alerts(db_path, siem)
     return out
 
 
@@ -48,6 +52,11 @@ def describe(res) -> str:
         parts.append(f"{res['ingest']['new']} new events")
     if res["detect"]:
         parts.append(f"{res['detect']['new_alerts']} new alerts")
+    s = res.get("siem")
+    if s and s["sent"]:
+        parts.append(f"{s['sent']} alerts sent to SIEM")
+    if s and s["error"]:
+        parts.append(f"SIEM problem: {s['error']} (will retry)")
     g = res["geo"]
     if g and (g["located"] or g["private"]):
         parts.append(f"{g['located']} IPs located, {g['private']} private")
@@ -63,7 +72,8 @@ def watch(stop, interval, **kw):
             res = pipeline_once(**kw)
             line = describe(res)
             changed = bool(res["warning"] or (res["ingest"] and res["ingest"]["new"])
-                           or (res["detect"] and res["detect"]["new_alerts"]))
+                           or (res["detect"] and res["detect"]["new_alerts"])
+                           or (res.get("siem") and (res["siem"]["sent"] or res["siem"]["error"])))
             if first or changed:
                 print(f"[{time.strftime('%H:%M:%S')}] {line}", flush=True)
         except Exception as exc:                       # keep the loop alive no matter what
@@ -92,6 +102,9 @@ def main(argv=None):
     p.add_argument("--host", default="127.0.0.1", help="dashboard address")
     p.add_argument("--port", type=int, default=5000, help="dashboard port")
     p.add_argument("--config", help="JSON file with detection threshold overrides")
+    p.add_argument("--siem", default=os.environ.get("SENTINEL_SIEM"),
+                   help="forward new alerts to a SIEM: syslog://HOST:514, syslog+tcp://HOST:514, "
+                        "http(s)://HOST/path or file:/path.json (default: off)")
     p.add_argument("--no-geo", action="store_true", help="never contact the geolocation service")
     p.add_argument("--no-dashboard", action="store_true", help="analysis loop only")
     args = p.parse_args(argv)
@@ -115,7 +128,7 @@ def main(argv=None):
         return
 
     kw = dict(log_path=args.log, state_path=str(DEFAULT_STATE), db_path=args.db,
-              config=config, use_geo=True)                  # --no-geo is honoured via SENTINEL_GEO=off:
+              config=config, use_geo=True, siem=args.siem)                  # --no-geo is honoured via SENTINEL_GEO=off:
                                                       # private IPs are still classified, nothing is sent out
     if args.mode == "once":
         print(describe(pipeline_once(**kw)))

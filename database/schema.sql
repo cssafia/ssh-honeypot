@@ -52,3 +52,9 @@ CREATE TABLE IF NOT EXISTS ip_geo (
     is_private   INTEGER NOT NULL DEFAULT 0,
     looked_up_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS siem_sent (
+    target   TEXT NOT NULL,
+    alert_id INTEGER NOT NULL,
+    PRIMARY KEY (target, alert_id)
+);

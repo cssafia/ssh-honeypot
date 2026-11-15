@@ -212,7 +212,8 @@
     }
     form.addEventListener('submit', (e) => { e.preventDefault(); exec(input.value); input.value = ''; });
     $$('#cmdchips .chipbtn').forEach((b) => b.addEventListener('click', () => exec(b.dataset.cmd)));
-    Deck.register('cowrie', { enter() { reset(); }, leave() { input.blur(); } });
+    let started = false;
+    Deck.register('cowrie', { enter() { if (!started) { reset(); started = true; } }, leave() { input.blur(); } });
   })();
 
   /* ================================================================ 06 vocabulary */

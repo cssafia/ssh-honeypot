@@ -69,6 +69,8 @@
     sl.dataset.now = n;
   }
 
+  const visited = new Set();   // slides already shown once: they come back fully built, never replayed
+
   /* ------------------------------------------------------------- navigation */
   function show(i, step) {
     i = Math.max(0, Math.min(slides.length - 1, i));
@@ -84,6 +86,8 @@
       sl.classList.remove('past');
       sl.classList.add('active');
       cur = i;
+      if (visited.has(sl.id) && !step) step = 'max';
+      visited.add(sl.id);
       stepNow = step === 'max' ? sl._max : (step || 0);
       applyStep(sl, stepNow);
       const m = modules[sl.id];

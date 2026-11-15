@@ -151,7 +151,7 @@
     }
     $('#bn-a').addEventListener('click', () => view('a'));
     $('#bn-b').addEventListener('click', () => view('b'));
-    Deck.register('botnet', { enter() { view('a'); }, step(n) { view(n >= 2 ? 'b' : 'a'); } });
+    Deck.register('botnet', { enter() { view('a'); }, step(n) { view(n >= 1 ? 'b' : 'a'); } });
   })();
 
   /* ====================================================================== 14  AFTER (replay) */
