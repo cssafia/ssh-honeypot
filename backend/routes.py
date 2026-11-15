@@ -2,6 +2,7 @@ import csv
 import io
 import ipaddress
 import os
+import time
 from datetime import datetime, timezone
 
 from flask import Blueprint, Response, current_app, jsonify, render_template, request
@@ -286,3 +287,53 @@ def report():
     headers = {"Content-Disposition": "attachment; filename=report.md"} \
         if request.args.get("download") else {}
     return Response(text, mimetype="text/markdown", headers=headers)
+
+
+# ------------------------------------------------------------- live updates (SSE)
+STREAM_POLL_S = float(os.environ.get("SENTINEL_STREAM_POLL", "1"))
+STREAM_HEARTBEAT_S = 15
+
+
+def _signature(db_path) -> str:
+    """Cheap fingerprint of 'everything the dashboard shows'. Changes when data changes."""
+    conn = get_connection(db_path)
+    try:
+        row = conn.execute(
+            "SELECT (SELECT COUNT(*) FROM attacks),"
+            "       (SELECT COALESCE(MAX(id), 0) FROM alerts),"
+            "       (SELECT COUNT(*) FROM alerts WHERE status = 'open'),"
+            "       (SELECT COUNT(*) FROM sessions),"
+            "       (SELECT COALESCE(SUM(commands_count), 0) FROM sessions),"
+            "       (SELECT COUNT(end_time) FROM sessions)").fetchone()
+        return "-".join(str(v) for v in row)
+    finally:
+        conn.close()
+
+
+@bp.get("/api/stream")
+def stream():
+    """Server-Sent Events: the browser is told the moment new data lands in the database.
+
+    The page never asks 'anything new?' on a timer; it just listens. `?once=1` sends the
+    current state and stops (used by the tests).
+    """
+    db_path, once = _db(), request.args.get("once") == "1"
+
+    def generate():
+        last, idle = None, 0.0
+        while True:
+            sig = _signature(db_path)
+            if sig != last:
+                last, idle = sig, 0.0
+                yield f"event: update\ndata: {sig}\n\n"
+                if once:
+                    return
+            elif idle >= STREAM_HEARTBEAT_S:           # keeps proxies/browsers from closing it
+                idle = 0.0
+                yield ": keep-alive\n\n"
+            time.sleep(STREAM_POLL_S)
+            idle += STREAM_POLL_S
+
+    resp = Response(generate(), mimetype="text/event-stream")
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp

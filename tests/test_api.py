@@ -106,3 +106,20 @@ def test_honeypot_status_demo_flag(client, monkeypatch):
     monkeypatch.setenv("SENTINEL_DEMO", "1")
     assert client.get("/api/honeypot/status").get_json()["demo"] is True
 
+
+
+def test_stream_sends_update_event(client):
+    r = client.get("/api/stream?once=1")
+    assert r.status_code == 200
+    assert r.mimetype == "text/event-stream"
+    body = r.get_data(as_text=True)
+    assert body.startswith("event: update\ndata: ")
+
+
+def test_stream_signature_changes_when_data_changes(tmp_path):
+    from backend.routes import _signature
+    db = tmp_path / "s.db"
+    create_app(db)
+    before = _signature(db)
+    insert_events([ev("2026-11-05T10:00:00Z")], db)
+    assert _signature(db) != before

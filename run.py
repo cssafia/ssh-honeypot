@@ -88,7 +88,7 @@ def main(argv=None):
     p.add_argument("mode", nargs="?", default="live", choices=["live", "once", "demo"])
     p.add_argument("--log", default=DEFAULT_LOG, help="Cowrie JSON log (default: %(default)s)")
     p.add_argument("--db", default=str(DEFAULT_DB), help="SQLite file (default: %(default)s)")
-    p.add_argument("--interval", type=int, default=15, help="seconds between analysis cycles")
+    p.add_argument("--interval", type=int, default=5, help="seconds between analysis cycles")
     p.add_argument("--host", default="127.0.0.1", help="dashboard address")
     p.add_argument("--port", type=int, default=5000, help="dashboard port")
     p.add_argument("--config", help="JSON file with detection threshold overrides")

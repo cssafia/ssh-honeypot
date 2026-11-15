@@ -338,4 +338,20 @@ $("prev").addEventListener("click", () => { state.page -= 1; loadEvents(); });
 $("next").addEventListener("click", () => { state.page += 1; loadEvents(); });
 
 refreshAll();
-setInterval(refreshAll, 30000);  
+
+// Live updates: the server pushes a message the moment new events/alerts/sessions are stored,
+// so the page refreshes after an event instead of on a timer.
+let liveTimer = null;
+function startLive() {
+  if (!window.EventSource) return;                       // very old browser: fall back below
+  const es = new EventSource("/api/stream");
+  es.addEventListener("update", () => {
+    clearTimeout(liveTimer);                             // merge bursts of events into one refresh
+    liveTimer = setTimeout(refreshAll, 300);
+  });
+  es.onopen = () => $("live").classList.add("on");
+  es.onerror = () => $("live").classList.remove("on");   // the browser reconnects by itself
+}
+$("live").addEventListener("click", () => refreshAll());
+startLive();
+setInterval(refreshAll, 120000);                         // safety net only  
